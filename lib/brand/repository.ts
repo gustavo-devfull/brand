@@ -34,8 +34,14 @@ export async function repository(locale?:Locale){
 
   async function local(){try{return JSON.parse(await readFile(filename,'utf8')) as Delta;}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return empty();throw e;}}
 
-  async function remote():Promise<Delta>{
+  async function remote(attempt=0):Promise<Delta>{
     const results=await Promise.all(['brands','templates','brand_assets','brand_fonts','campaigns'].map(table=>db!.from(table).select('payload').eq('owner_id',id)));
+    // Logo após o sign-in anônimo, o JWT pode chegar ao PostgREST com `iat` alguns
+    // milissegundos à frente do relógio dele ("JWT issued at future"). É um desvio
+    // entre serviços do próprio Supabase, some sozinho, e sem esta reentrega a
+    // primeira carga de um visitante novo falharia de vez em quando.
+    const skew=results.find(r=>/issued at future/i.test(r.error?.message??''));
+    if(skew&&attempt<2){await new Promise(resolve=>setTimeout(resolve,1200));return remote(attempt+1);}
     for(const result of results)check(result.error);
     return {
       brands:results[0].data!.map(r=>r.payload as Brand),

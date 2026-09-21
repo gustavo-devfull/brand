@@ -162,6 +162,22 @@ público. `supabase:verify` tem um teste de regressão para isso.
 > Na Vercel o Supabase é obrigatório — o workspace local em JSON precisa de um
 > sistema de arquivos gravável.
 
+### Publicando na Vercel
+
+O projeto conectado ao repositório constrói a cada push em `main`. As duas variáveis
+precisam existir em Production e Preview **como variáveis normais, não "Sensitive"**:
+`NEXT_PUBLIC_*` é embutida no bundle em build time, e uma variável sensível não fica
+disponível nessa fase — o app sobe achando que o Supabase não está configurado.
+
+```bash
+npx vercel link --project brand
+printf '%s' "$URL" | npx vercel env add NEXT_PUBLIC_SUPABASE_URL production
+printf '%s' "$KEY" | npx vercel env add NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY production
+```
+
+Depois de mudar uma variável, reconstrua (`npx vercel redeploy <url>`): trocar o valor
+não altera um build já feito.
+
 ---
 
 ## Testes
