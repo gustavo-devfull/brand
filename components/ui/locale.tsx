@@ -1,6 +1,6 @@
 'use client';
 import { createContext,useCallback,useContext,useMemo,useState,type ReactNode } from 'react';
-import { Languages } from 'lucide-react';
+import { SegmentedControl } from '@mantine/core';
 import { dictionary,localeCookie,type Dictionary,type Locale } from '@/lib/i18n';
 
 type State={locale:Locale;t:Dictionary;setLocale:(next:Locale)=>void};
@@ -27,8 +27,6 @@ export function useI18n(){
 
 export function LocaleToggle(){
   const {locale,t,setLocale}=useI18n();
-  return <button type="button" className="locale-toggle" aria-label={t.locale.switchAria} title={t.locale.label}
-    onClick={()=>setLocale(locale==='pt'?'en':'pt')}>
-    <Languages size={15}/><span>{locale.toUpperCase()}</span>
-  </button>;
+  return <SegmentedControl size="xs" radius="xl" value={locale} onChange={v=>setLocale(v as Locale)} aria-label={t.locale.label}
+    data={[{value:'pt',label:'PT'},{value:'en',label:'EN'}]}/>;
 }

@@ -99,6 +99,29 @@ rede de segurança.
 
 ---
 
+## Interface
+
+A interface é construída com **Mantine 9**: `AppShell` para o layout, tema em
+`lib/theme.ts` com as escalas da marca (`brand` laranja, `navy` azul-marinho) e a
+Manrope, e componentes do core para tudo o mais. O `globals.css` guarda só o que o
+tema não cobre — o destaque serifado dos títulos e os editores de marcação.
+
+Três skills do Mantine para agentes estão instaladas em `.agents/skills/` e foram
+seguidas onde se aplicam:
+
+- **mantine-form** — o formulário de marca usa `useForm` com campos aninhados no mesmo
+  formato do schema do servidor, validação no blur espelhando o que a API exige, e
+  `NumberInput`/`ColorInput`, que por si sós eliminam os estados inválidos que antes
+  viravam um 400.
+- **mantine-combobox** — o seletor de tipografia é um `Combobox` que desenha cada
+  família **na própria fonte**, carregando-a no navegador pela API `FontFace` a partir
+  dos bytes que a marca já guarda.
+- **mantine-custom-components** — `Swatch` é construído com `factory()`, Styles API e
+  `createVarsResolver`, então o tema pode redefinir tamanho, raio e classes sem tocar no
+  componente.
+
+Para reinstalar ou atualizar as skills: `npx skills add https://github.com/mantinedev/skills --skill <nome>`.
+
 ## Módulos
 
 ```
@@ -121,6 +144,11 @@ lib/
   renderer/fonts.ts          Carregamento de fontes e medição de texto
   renderer/render.ts         Preenchimento determinístico de slots e vetorização do texto
   validation/engine.ts       As 12 regras de marca
+
+lib/theme.ts               Tema Mantine: escalas brand (laranja) e navy, Manrope, raios e sombras
+components/ui/blocks.tsx   Blocos de layout compartilhados (cabeçalho, título de painel, item de regra)
+components/ui/swatch/      Componente com factory() e Styles API, conforme a skill mantine-custom-components
+components/brand/          Formulário com useForm (mantine-form) e seletor de tipografia com Combobox (mantine-combobox)
 
 schemas/                     Objetos estritos do Zod — o único vocabulário aceito
 supabase/migrations/         Tabelas, políticas de RLS e o bucket privado de imagens

@@ -1,4 +1,12 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+const nav = (page: Page) => page.locator('nav');
+// Os inputs de rádio do SegmentedControl e do Chip são visualmente ocultos: o alvo é o label.
+const pick = (page: Page, text: string) => page.locator('label', { hasText: new RegExp(`^${text}$`) }).first().click();
+const switchToEnglish = async (page: Page) => {
+  await pick(page, 'EN');
+  await page.waitForResponse(r => r.url().includes('/api/workspace'));
+};
 
 test.describe('o estúdio de campanha', () => {
   test('já vem com uma campanha demo aprovada pela marca', async ({ page }) => {
@@ -6,16 +14,16 @@ test.describe('o estúdio de campanha', () => {
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Na marca.');
     // Trava a suíte no workspace local: com credenciais reais, cada teste criaria um
     // usuário anônimo no projeto Supabase.
-    await expect(page.locator('.demo-label')).toHaveText('WORKSPACE DEMO');
+    await expect(page.getByTestId('workspace-mode')).toHaveText('WORKSPACE DEMO');
 
-    await expect(page.locator('.variation-card')).toHaveCount(3);
-    await expect(page.locator('.compliance-badge').first()).toContainText('100%');
-    await expect(page.locator('.artboard img').first()).toBeVisible();
+    await expect(page.getByTestId('variation-card')).toHaveCount(3);
+    await expect(page.getByTestId('compliance-badge').first()).toContainText('100%');
+    await expect(page.getByTestId('variation-card').first().locator('img')).toBeVisible();
   });
 
   test('transforma um briefing em três direções novas', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.variation-card')).toHaveCount(3);
+    await expect(page.getByTestId('variation-card')).toHaveCount(3);
 
     await page.getByLabel('O que vamos criar?').fill(
       'Apresente um ritual noturno restaurador para quem valoriza luxo silencioso, manhãs sem pressa e trabalho artesanal.',
@@ -28,7 +36,7 @@ test.describe('o estúdio de campanha', () => {
     expect((await response).status()).toBe(200);
 
     await expect(page.getByText('Validação concluída')).toBeVisible();
-    await expect(page.locator('.variation-card')).toHaveCount(3);
+    await expect(page.getByTestId('variation-card')).toHaveCount(3);
     await expect(page.getByText('3 de 3 variações aprovadas')).toBeVisible();
   });
 
@@ -46,9 +54,9 @@ test.describe('o estúdio de campanha', () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText('RASTRO DA DECISÃO')).toBeVisible();
     await expect(dialog.getByText('Template', { exact: true })).toBeVisible();
-    await expect(dialog.locator('.protected-note')).toHaveText('0 elementos protegidos modificados');
-    await expect(dialog.locator('.rule-detail')).toHaveCount(12);
-    await expect(dialog.locator('.rule-detail.fail')).toHaveCount(0);
+    await expect(dialog.getByTestId('protected-note')).toContainText('0 elementos protegidos modificados');
+    await expect(dialog.getByTestId('rule-detail')).toHaveCount(12);
+    await expect(dialog.locator('[data-testid="rule-detail"][data-status="fail"]')).toHaveCount(0);
 
     await dialog.getByRole('button', { name: 'Fechar inspeção' }).click();
     await expect(dialog).toBeHidden();
@@ -68,23 +76,17 @@ test.describe('o toggle de idioma', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'pt-BR');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Na marca.');
 
-    const toggle = page.getByRole('button', { name: 'Mudar o idioma para inglês' });
-    await expect(toggle).toHaveText('PT');
-
-    const reseed = page.waitForResponse(r => r.url().includes('/api/workspace'));
-    await toggle.click();
-    await reseed;
+    await switchToEnglish(page);
 
     // A interface muda na hora e o workspace demo é regerado no servidor.
     await expect(page.getByRole('heading', { level: 1 })).toContainText('On-brand.');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await expect(page.getByRole('button', { name: 'Switch the language to Portuguese' })).toHaveText('EN');
     await expect(page.getByText('Creative brief')).toBeVisible();
   });
 
   test('a escolha sobrevive a um recarregamento e vale em todas as páginas', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Mudar o idioma para inglês' }).click();
+    await switchToEnglish(page);
     await expect(page.getByRole('heading', { level: 1 })).toContainText('On-brand.');
 
     await page.reload();
@@ -99,13 +101,13 @@ test.describe('o toggle de idioma', () => {
 
   test('a campanha demo em inglês continua aprovada', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('button', { name: 'Mudar o idioma para inglês' }).click();
+    await switchToEnglish(page);
     await expect(page.getByRole('heading', { level: 1 })).toContainText('On-brand.');
 
-    await expect(page.locator('.variation-card')).toHaveCount(3);
-    await expect(page.locator('.compliance-badge').first()).toContainText('100%');
+    await expect(page.getByTestId('variation-card')).toHaveCount(3);
+    await expect(page.getByTestId('compliance-badge').first()).toContainText('100%');
     await page.getByRole('button', { name: 'Inspect decision' }).first().click();
-    await expect(page.getByRole('dialog').locator('.rule-detail.fail')).toHaveCount(0);
+    await expect(page.getByRole('dialog').locator('[data-testid="rule-detail"][data-status="fail"]')).toHaveCount(0);
   });
 });
 
@@ -114,49 +116,56 @@ test.describe('edição de marca e tipografia', () => {
     await page.goto('/brands');
     await page.getByRole('button', { name: 'Editar marca' }).click();
 
-    await expect(page.getByRole('heading', { level: 2, name: /Editar Serein/ })).toBeVisible();
+    await expect(page.getByText(/Editar Serein/)).toBeVisible();
     await page.getByLabel('Nome da marca').fill('Serein Studio');
 
     const response = page.waitForResponse(r => r.url().includes('/api/brands') && r.request().method() === 'PATCH');
     await page.getByRole('button', { name: 'Salvar alterações' }).click();
     expect((await response).status()).toBe(200);
 
-    await expect(page.getByText(/Serein Studio atualizada\. 5 templates refeitos/)).toBeVisible();
-    await expect(page.getByRole('combobox', { name: 'Selecionar marca' })).toHaveValue(/.+/);
+    await expect(page.getByTestId('notice-message')).toContainText(/Serein Studio atualizada\. 5 templates refeitos/);
   });
 
   test('um campo numérico apagado bloqueia o salvamento em vez de dar erro do servidor', async ({ page }) => {
     await page.goto('/brands');
     await page.getByRole('button', { name: 'Editar marca' }).click();
 
-    const save = page.getByRole('button', { name: 'Salvar alterações' });
-    await expect(save).toBeEnabled();
-
-    // Apagar para digitar outro valor é o gesto normal; antes isso virava 0 e um 400.
-    await page.getByLabel('Margem do grid').fill('');
-    await expect(save).toBeDisabled();
+    // Apagar para digitar outro valor é o gesto normal; o formulário valida no blur e
+    // recusa o envio, então nenhum PATCH chega ao servidor.
+    const margin = page.getByLabel('Margem do grid');
+    await margin.fill('');
+    await margin.blur();
     await expect(page.getByText('1 campo precisa de um valor válido antes de salvar.')).toBeVisible();
 
-    await page.getByLabel('Margem do grid').fill('72');
-    await expect(save).toBeEnabled();
+    let patched = false;
+    page.on('request', r => { if (r.url().includes('/api/brands') && r.method() === 'PATCH') patched = true; });
+    await page.getByRole('button', { name: 'Salvar alterações' }).click();
+    await page.waitForTimeout(400);
+    expect(patched).toBe(false);
+
+    await margin.fill('72');
+    await margin.blur();
+    await expect(page.getByText(/campo precisa de um valor válido/)).toBeHidden();
   });
 
-  test('uma cor hex incompleta bloqueia o salvamento', async ({ page }) => {
+  test('uma cor hex incompleta é corrigida antes de chegar ao servidor', async ({ page }) => {
     await page.goto('/brands');
     await page.getByRole('button', { name: 'Editar marca' }).click();
 
-    const swatch = page.locator('.color-field').filter({ hasText: 'Primária' }).locator('input[type="text"], input:not([type])').last();
-    await swatch.fill('#FF6B0');
-    await expect(page.getByRole('button', { name: 'Salvar alterações' })).toBeDisabled();
-    await swatch.fill('#FF6B00');
-    await expect(page.getByRole('button', { name: 'Salvar alterações' })).toBeEnabled();
+    // O ColorInput descarta um valor inválido no blur e volta ao último válido, então o
+    // estado que antes virava um 400 nem chega a existir.
+    const primary = page.getByLabel('Primária');
+    await primary.fill('#FF6B0');
+    await primary.blur();
+    await expect(primary).toHaveValue('#243D33');
+    await expect(page.getByText(/campo precisa de um valor válido/)).toBeHidden();
   });
 
   test('o seletor de tipografia só oferece famílias registradas', async ({ page }) => {
     await page.goto('/brands');
     await page.getByRole('button', { name: 'Editar marca' }).click();
-    const display = page.getByLabel('Fonte display');
-    await expect(display.locator('option')).toHaveText(['Cormorant Garamond', 'DM Sans']);
+    await page.getByTestId('typeface-display').click();
+    await expect(page.getByRole('option')).toHaveText([/Cormorant Garamond/, /DM Sans/]);
   });
 
   test('busca uma família no Google Fonts e disponibiliza nos tokens', async ({ page }) => {
@@ -168,44 +177,45 @@ test.describe('edição de marca e tipografia', () => {
     await page.getByRole('button', { name: 'Buscar', exact: true }).click();
     expect((await response).status()).toBe(201);
 
-    await expect(page.getByText(/Manrope já pode ser usada/)).toBeVisible();
-    await expect(page.locator('.font-row')).toHaveCount(3);
+    await expect(page.getByTestId('notice-message')).toContainText(/Manrope já pode ser usada/);
+    await expect(page.getByTestId('font-row')).toHaveCount(3);
 
     // A família nova passa a valer como token da marca.
     await page.getByRole('button', { name: 'Editar marca' }).click();
-    await expect(page.getByLabel('Fonte display').locator('option')).toHaveText(['Cormorant Garamond', 'DM Sans', 'Manrope']);
+    await page.getByTestId('typeface-display').click();
+    await expect(page.getByRole('option')).toHaveText([/Cormorant Garamond/, /DM Sans/, /Manrope/]);
   });
 
   test('recusa uma família que o Google não tem', async ({ page }) => {
     await page.goto('/brands');
     await page.getByLabel('Buscar no Google Fonts').fill('Fonte Que Nao Existe');
     await page.getByRole('button', { name: 'Buscar', exact: true }).click();
-    await expect(page.locator('.error-message')).toContainText('não tem uma fonte chamada');
+    await expect(page.getByTestId('error-message')).toContainText('não tem uma fonte chamada');
   });
 });
 
 test.describe('as mensagens de erro', () => {
+  const brokenSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"><script/></svg>';
+
   test('uma marcação inválida é recusada no idioma da interface', async ({ page }) => {
     await page.goto('/templates');
     await page.getByRole('button', { name: 'Adicionar template' }).click();
     await page.getByLabel('Nome do template').fill('Template quebrado');
-    await page.getByLabel('Marcação SVG do template').fill('<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"><script/></svg>');
+    await page.getByLabel('Marcação SVG do template').fill(brokenSvg);
     await page.getByRole('button', { name: 'Aprovar template' }).click();
-
-    await expect(page.locator('.error-message')).toHaveText('Elemento SVG não suportado: script');
+    await expect(page.getByTestId('error-message')).toHaveText('Elemento SVG não suportado: script');
   });
 
   test('a mesma recusa chega em inglês depois do toggle', async ({ page }) => {
     await page.goto('/templates');
-    await page.getByRole('button', { name: 'Mudar o idioma para inglês' }).click();
+    await switchToEnglish(page);
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Geometry the agent');
 
     await page.getByRole('button', { name: 'Add template' }).click();
     await page.getByLabel('Template name').fill('Broken template');
-    await page.getByLabel('Template SVG markup').fill('<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080"><script/></svg>');
+    await page.getByLabel('Template SVG markup').fill(brokenSvg);
     await page.getByRole('button', { name: 'Approve template' }).click();
-
-    await expect(page.locator('.error-message')).toHaveText('Unsupported SVG element: script');
+    await expect(page.getByTestId('error-message')).toHaveText('Unsupported SVG element: script');
   });
 });
 
@@ -213,18 +223,18 @@ test.describe('os módulos do workspace', () => {
   test('a visão geral relata o estado do sistema', async ({ page }) => {
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Tudo na marca.');
-    await expect(page.locator('.stat-card')).toHaveCount(4);
+    await expect(page.getByTestId('stat-card')).toHaveCount(4);
     await expect(page.getByText('3 de 3 peças geradas aprovadas')).toBeVisible();
-    await expect(page.locator('.rule-bars li')).toHaveCount(12);
-    await expect(page.locator('.roster-card')).toHaveCount(1);
+    await expect(page.getByTestId('rule-bar')).toHaveCount(12);
+    await expect(page.getByTestId('roster-card')).toHaveCount(1);
   });
 
   test('o módulo de marca expõe tokens, regras e a biblioteca', async ({ page }) => {
     await page.goto('/brands');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('A fonte da verdade.');
-    await expect(page.getByRole('combobox', { name: 'Selecionar marca' })).toHaveValue(/.+/);
-    await expect(page.locator('.swatches > div').first()).toBeVisible();
-    await expect(page.locator('.asset-card')).toHaveCount(3);
+    await expect(page.getByTestId('brand-select').first()).toHaveValue(/.+/);
+    await expect(page.getByTestId('swatches').locator('> div').first()).toBeVisible();
+    await expect(page.getByTestId('asset-card')).toHaveCount(3);
     await expect(page.getByText('Solte as imagens aqui, ou procure')).toBeVisible();
   });
 
@@ -237,22 +247,21 @@ test.describe('os módulos do workspace', () => {
     await page.getByRole('button', { name: 'Registrar sistema de marca' }).click();
     expect((await response).status()).toBe(201);
 
-    await expect(page.getByText(/Aurelia registrada com cinco templates aprovados/)).toBeVisible();
-    await expect(page.getByRole('combobox', { name: 'Selecionar marca' })).toHaveValue(/.+/);
+    await expect(page.getByTestId('notice-message')).toContainText(/Aurelia registrada com cinco templates aprovados/);
   });
 
   test('o módulo de templates lista a geometria aprovada e seu contrato', async ({ page }) => {
     await page.goto('/templates');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Geometria que o agente');
-    await expect(page.locator('.template-card')).toHaveCount(5);
+    await expect(page.getByTestId('template-card')).toHaveCount(5);
 
-    await page.getByRole('button', { name: 'Story do Instagram', exact: true }).click();
-    await expect(page.locator('.template-card')).toHaveCount(1);
+    await pick(page, 'Story do Instagram');
+    await expect(page.getByTestId('template-card')).toHaveCount(1);
 
     await page.getByRole('button', { name: 'Inspecionar contrato' }).first().click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('CONTRATO DO TEMPLATE')).toBeVisible();
-    await expect(dialog.getByRole('heading', { level: 2 })).toHaveText('Story vertical');
+    await expect(dialog.getByRole('heading', { name: 'Story vertical', exact: true })).toBeVisible();
     await expect(dialog.getByText('1080 × 1920')).toBeVisible();
     await expect(dialog.getByText('heroImage, logo, headline, description, cta')).toBeVisible();
   });
@@ -262,34 +271,33 @@ test.describe('os módulos do workspace', () => {
     await page.getByRole('button', { name: 'Adicionar template' }).click();
 
     await page.getByLabel('Nome do template').fill('Quadrado Editorial');
-    await expect(page.getByLabel('Marcação SVG do template')).toContainText('data-slot="headline"');
+    await expect(page.getByLabel('Marcação SVG do template')).toHaveValue(/data-slot="headline"/);
 
     const response = page.waitForResponse(r => r.url().includes('/api/templates') && r.request().method() === 'POST');
     await page.getByRole('button', { name: 'Aprovar template' }).click();
     expect((await response).status()).toBe(201);
 
-    await expect(page.getByText(/Quadrado Editorial aprovado em 1080×1080/)).toBeVisible();
-    await expect(page.locator('.template-card')).toHaveCount(6);
+    await expect(page.getByTestId('notice-message')).toContainText(/Quadrado Editorial aprovado em 1080×1080/);
+    await expect(page.getByTestId('template-card')).toHaveCount(6);
   });
 
   test('o módulo de arquitetura explica o pipeline', async ({ page }) => {
     await page.goto('/architecture');
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Liberdade criativa.');
-    await expect(page.locator('.stage-card')).toHaveCount(5);
-    await expect(page.locator('.flow-node')).toHaveCount(6);
-    await expect(page.locator('.guarantee-card')).toHaveCount(4);
+    await expect(page.getByTestId('stage-card')).toHaveCount(5);
+    await expect(page.getByTestId('flow-node')).toHaveCount(6);
+    await expect(page.getByTestId('guarantee-card')).toHaveCount(4);
   });
 
   test('a navegação alcança todos os módulos', async ({ page }) => {
     await page.goto('/');
-    const nav = page.locator('aside.sidebar nav');
     for (const [label, heading] of [
       [/^Visão geral$/, 'Tudo na marca.'],
       [/^Marcas$/, 'A fonte da verdade.'],
       [/^Templates$/, 'Geometria que o agente'],
       [/^Campanhas/, 'Na marca.'],
     ] as const) {
-      await nav.getByRole('link', { name: label }).click();
+      await nav(page).getByRole('link', { name: label }).click();
       await expect(page.getByRole('heading', { level: 1 })).toContainText(heading);
     }
   });

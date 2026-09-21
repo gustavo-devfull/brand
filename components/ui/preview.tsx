@@ -1,9 +1,8 @@
 'use client';
 import { useEffect,useState } from 'react';
-import { useI18n } from './locale';
-export function SvgPreview({svg,alt,className=''}:{svg:string;alt:string;className?:string}){
-  const {t}=useI18n();
+import { Skeleton } from '@mantine/core';
+export function SvgPreview({svg,alt,className='',height}:{svg:string;alt:string;className?:string;height?:number}){
   const [url,setUrl]=useState('');
   useEffect(()=>{if(!svg)return;const objectUrl=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));setUrl(objectUrl);return()=>URL.revokeObjectURL(objectUrl);},[svg]);
-  return url?<img className={className} src={url} alt={alt}/>:<div className="preview-placeholder">{t.common.preparingPreview}</div>;
+  return url?<img className={`svg-preview ${className}`} src={url} alt={alt}/>:<Skeleton height={height??120} radius="md"/>;
 }

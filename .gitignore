@@ -10,3 +10,5 @@ playwright-report/
 .playwright/
 supabase/.temp/
 .vercel
+# Symlinks locais (caminho absoluto) para .agents/skills, criados por `npx skills add`
+.claude/skills/

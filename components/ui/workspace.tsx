@@ -1,5 +1,6 @@
 'use client';
 import { createContext,useCallback,useContext,useEffect,useState,type ReactNode } from 'react';
+import { Alert,Button,Center,Loader,Stack,Text } from '@mantine/core';
 import { useI18n } from './locale';
 import type { Workspace } from '@/types';
 
@@ -32,7 +33,7 @@ export function useWorkspace(){const context=useContext(Context);if(!context)thr
 
 export function Loading(){
   const {error,reload}=useWorkspace();const {t}=useI18n();
-  return <div className="empty-state">{error
-    ?<><h2>{t.workspace.unavailable}</h2><p role="alert">{error}</p><button className="button" onClick={()=>void reload()}>{t.common.tryAgain}</button></>
-    :<><div className="spinner"/><p>{t.workspace.preparing}</p></>}</div>;
+  return <Center mih={320}>{error
+    ?<Alert color="red" title={t.workspace.unavailable} maw={480} role="alert"><Stack gap="sm"><Text size="sm">{error}</Text><Button variant="light" onClick={()=>void reload()}>{t.common.tryAgain}</Button></Stack></Alert>
+    :<Stack align="center" gap="sm"><Loader color="brand"/><Text c="dimmed" size="sm">{t.workspace.preparing}</Text></Stack>}</Center>;
 }
